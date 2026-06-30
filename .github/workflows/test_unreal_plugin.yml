@@ -1,0 +1,135 @@
+# ┌──────────────────────────────────────────────────────────────────────────┐
+# │  Reusable test workflow — UBT build + UE Automation specs for ONE UE      │
+# │  version, on a SELF-HOSTED Windows UE runner. Analog of Unity-AI-*'s        │
+# │  test_unity_plugin.yml. Called by test_pull_request.yml + release.yml.      │
+# │  Licensed under the Apache License, Version 2.0.                            │
+# └──────────────────────────────────────────────────────────────────────────┘
+#
+# NEVER red-by-absence: the job is gated on `vars.UNREAL_RUNNER_READY == 'true'`.
+# While that variable is unset (no self-hosted UE runner registered), the job is
+# SKIPPED — a skipped job does not fail the PR. Once the owner registers a runner
+# with both target UE versions installed they set UNREAL_RUNNER_READY=true and the
+# leg becomes a live required-when-available check (mirrors Unreal-MCP core).
+#
+# Required repository configuration before enabling:
+#   vars.UNREAL_RUNNER_READY = 'true'
+#   vars.UNREAL_HOST_PROJECT = absolute path on the runner to a host .uproject that
+#     has the UnrealMCP core plugin available (its Plugins/UnrealMCP junctions to a
+#     UnrealMCP checkout/package). This workflow junctions THIS extension into the
+#     same host's Plugins/ and builds the host editor target so the specs compile in.
+name: test-unreal-plugin
+
+on:
+  workflow_dispatch:
+    inputs:
+      ue: { description: "UE version (e.g. 5.7)", required: true, type: string }
+  workflow_call:
+    inputs:
+      ue: { required: true, type: string }
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: UE ${{ inputs.ue }} host build + Automation
+    # Gated on the runner being registered AND (for PRs) the PR originating from THIS
+    # repo, never a fork (a fork PR must never run its checked-out code on a self-hosted
+    # runner). Manual dispatches are trusted and unaffected by the fork clause.
+    if: ${{ vars.UNREAL_RUNNER_READY == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: [self-hosted, windows, unreal]
+    env:
+      UE_ROOT: C:\Program Files\Epic Games\UE_${{ inputs.ue }}
+      HOST_UPROJECT: ${{ vars.UNREAL_HOST_PROJECT }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Resolve plugin + module name
+        id: meta
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $uplugin = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Recurse -Filter '*.uplugin' |
+            Where-Object { $_.FullName -notmatch '[\\/](Binaries|Intermediate|Saved)[\\/]' } | Select-Object -First 1
+          if (-not $uplugin) { throw "No .uplugin found in the checkout." }
+          $module = [System.IO.Path]::GetFileNameWithoutExtension($uplugin.Name)
+          echo "plugin_dir=$($uplugin.Directory.FullName)" >> $env:GITHUB_OUTPUT
+          echo "module=$module" >> $env:GITHUB_OUTPUT
+          echo "Resolved plugin '$module' at $($uplugin.Directory.FullName)"
+
+      # NOTE: there is deliberately NO standalone `BuildPlugin -Rocket` step. An extension
+      # depends on the UnrealMCP plugin, and standalone BuildPlugin builds in an isolated
+      # HostProject that CANNOT resolve UnrealMCP unless it is engine-installed into
+      # UE_ROOT\Engine\Plugins\Marketplace (see docs/claude/release.md). The per-UE compile
+      # validation is the host-editor-target build below, which resolves UnrealMCP via the
+      # host project (UNREAL_HOST_PROJECT) — matching the documented design (docs/claude/ci.md:
+      # "Build the plugin via UBT against the host project").
+      - name: Build host editor target (junction this extension into the host project)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:HOST_UPROJECT)) {
+            throw "UNREAL_HOST_PROJECT repo variable is not set — needed for the Automation pass."
+          }
+          $hostPlugins = Join-Path (Split-Path -Parent $env:HOST_UPROJECT) 'Plugins'
+          New-Item -ItemType Directory -Force -Path $hostPlugins | Out-Null
+          $link = Join-Path $hostPlugins '${{ steps.meta.outputs.module }}'
+          if (Test-Path $link) {
+            $existing = Get-Item $link -Force
+            if ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+              cmd /c rmdir "$link"                 # junction: unlink only (never follows into the target)
+            } else {
+              Remove-Item $link -Recurse -Force    # leftover real dir (e.g. from the e2e install) — safe: not a reparse point
+            }
+          }
+          # Junction the host's Plugins/<module> -> this checkout's plugin dir so the host editor
+          # compiles THIS extension (and its Automation specs) in.
+          cmd /c mklink /J "$link" "${{ steps.meta.outputs.plugin_dir }}"
+          $hostBuild = Join-Path $env:UE_ROOT 'Engine\Build\BatchFiles\Build.bat'
+          $hostTarget = [System.IO.Path]::GetFileNameWithoutExtension($env:HOST_UPROJECT) + 'Editor'
+          & $hostBuild $hostTarget Win64 Development -project="$env:HOST_UPROJECT" -WaitMutex
+          if ($LASTEXITCODE -ne 0) { throw "Host editor target ($hostTarget) build failed (exit $LASTEXITCODE)" }
+
+      - name: Run Automation specs (filter = module name)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $editorCmd = Join-Path $env:UE_ROOT 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
+          $reportDir = Join-Path $env:RUNNER_TEMP 'AutomationReport'
+          if (Test-Path $reportDir) { Remove-Item $reportDir -Recurse -Force }
+          & $editorCmd "$env:HOST_UPROJECT" -nullrhi -nosplash -unattended `
+            -ExecCmds="Automation RunTests ${{ steps.meta.outputs.module }}; Quit" `
+            -ReportExportPath="$reportDir" -log
+          # The editor's exit code is unreliable for test verdicts; the parsed index.json is
+          # authoritative. Clear it so pwsh's auto-appended `exit $LASTEXITCODE` does not red
+          # the step on an unrelated nonzero editor exit.
+          $global:LASTEXITCODE = 0
+          echo "REPORT_DIR=$reportDir" >> $env:GITHUB_ENV
+
+      - name: Parse Automation report (index.json is authoritative)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $index = Join-Path $env:REPORT_DIR 'index.json'
+          if (-not (Test-Path $index)) {
+            throw "Automation index.json is MISSING at $index — the run crashed or produced no report (treat as FAILURE)."
+          }
+          $report = Get-Content $index -Raw | ConvertFrom-Json
+          $failed = [int]$report.failed
+          $passed = [int]$report.succeeded + [int]$report.succeededWithWarnings
+          Write-Host "Automation results: passed=$passed failed=$failed"
+          if ($failed -gt 0) { throw "$failed Automation test(s) failed." }
+          if ($passed -lt 1) { throw "No Automation tests succeeded — expected at least one ${{ steps.meta.outputs.module }} spec." }
+          Write-Host "All Automation specs passed."
+
+      - name: Upload Automation report on failure
+        if: ${{ failure() && env.REPORT_DIR != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: automation-report-ue-${{ inputs.ue }}
+          path: ${{ env.REPORT_DIR }}
+          if-no-files-found: ignore
+          retention-days: 7

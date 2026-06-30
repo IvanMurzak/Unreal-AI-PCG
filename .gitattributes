@@ -1,0 +1,12 @@
+# Shebang scripts MUST use LF, or the `#!/usr/bin/env ...` line breaks on Linux/macOS
+# (a CRLF makes the interpreter literally `python3\r`). The template ships commands/init.py
+# (run on macOS/Linux for cross-platform parity) and any *.sh helpers.
+*.py text eol=lf
+*.sh text eol=lf
+
+# PowerShell + C#/C++ sources: keep CRLF on Windows checkouts (UE/MSVC-friendly), normalized
+# in the repo so diffs stay stable across platforms.
+*.ps1 text eol=crlf
+*.cpp text eol=crlf
+*.h   text eol=crlf
+*.cs  text eol=crlf

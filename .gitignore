@@ -1,0 +1,40 @@
+# ----------------------------------------------------------------------------
+# Unreal Engine — plugin build artifacts (regenerated on every build)
+# ----------------------------------------------------------------------------
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+.vs/
+.idea/
+*.sln
+*.VC.db
+*.VC.VC.opendb
+*.opensdf
+*.opendb
+*.sdf
+*.suo
+*.user
+*.xcodeproj
+*.xcworkspace
+
+# ----------------------------------------------------------------------------
+# BuildPlugin / release packaging output
+# ----------------------------------------------------------------------------
+Package/
+Packaged/
+*.zip
+
+# ----------------------------------------------------------------------------
+# Node (E2E harness uses unreal-mcp-cli)
+# ----------------------------------------------------------------------------
+node_modules/
+*.tsbuildinfo
+
+# ----------------------------------------------------------------------------
+# Secrets — NEVER commit
+# ----------------------------------------------------------------------------
+.env
+
+# Claude agent scratch
+.claude/agent-memory/

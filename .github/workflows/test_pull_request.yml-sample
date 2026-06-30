@@ -1,0 +1,113 @@
+# ┌──────────────────────────────────────────────────────────────────────────┐
+# │  Pull-request CI for an Unreal-MCP extension. Activated by commands/init   │
+# │  (renamed from .yml-sample). Mirrors Unity-AI-*'s test_pull_request.yml,    │
+# │  adapted to Unreal. Licensed under the Apache License, Version 2.0.         │
+# └──────────────────────────────────────────────────────────────────────────┘
+#
+# Two gates, both never-red-by-absence (self-hosted UE runner required):
+#   (1) plugin-ue-5.7 — UBT build + UE Automation specs via the reusable
+#       test_unreal_plugin.yml. Gated inside that workflow on UNREAL_RUNNER_READY.
+#       (5.8 is temporarily scoped out — see the TODO(5.8) on the jobs below.)
+#   (2) e2e — boot a headless editor, install THIS extension with
+#       `unreal-mcp-cli install-extension`, then invoke every tool with
+#       `unreal-mcp-cli run-tool` (Tests/e2e) and assert a well-formed success.
+#       Gated on UNREAL_E2E_READY.
+#
+# The multi-UE matrix (target: 5.7 + 5.8) is the analog of Unity's multi-version matrix and
+# informs the compile-on-install per-version decision (design note §5). It is temporarily
+# scoped to 5.7 only; see TODO(5.8) below.
+name: test-pull-request
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-pr-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # TODO(5.8): cross-version UHT contamination in shared UnrealMCP Intermediate. Target
+  # matrix is 5.7 + 5.8, but the self-hosted runner currently builds UnrealMCP cleanly only
+  # for UE 5.7. The host project shares ONE UnrealMCP source built sequentially for both
+  # engines, so 5.7's generated UHT codegen (Intermediate/.../UHT/*.gen.cpp) is reused by the
+  # 5.8 compile (the FClass/FProperty param struct layouts differ between 5.7 and 5.8 ->
+  # C2440/C2078/C2660). UnrealMCP itself is 5.8-compatible (Unreal-MCP's own CI proves it).
+  # Restore the `plugin-ue-5-8` job + the "5.8" e2e matrix entry once the runner host provides
+  # a PER-UE-VERSION UnrealMCP (engine-install into each UE_5.x\Engine\Plugins\Marketplace, or
+  # per-version package junctions).
+  plugin-ue-5-7:
+    uses: ./.github/workflows/test_unreal_plugin.yml
+    with:
+      ue: "5.7"
+
+  # End-to-end: install this extension via the CLI, then call each tool over the live
+  # local MCP server. Consumes `unreal-mcp-cli install-extension` (the install/T1 layer)
+  # — a deliberate cross-dependency (design note §7). Gated separately so it never reds a
+  # PR by absence until the owner validates it once and sets vars.UNREAL_E2E_READY=true.
+  e2e:
+    name: e2e tool-invocation (UE ${{ matrix.ue }})
+    if: ${{ vars.UNREAL_E2E_READY == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: [self-hosted, windows, unreal]
+    strategy:
+      fail-fast: false
+      matrix:
+        ue: ["5.7"] # TODO(5.8): re-add "5.8" once the host runner builds UnrealMCP for 5.8 (see above)
+    env:
+      UE_ROOT: C:\Program Files\Epic Games\UE_${{ matrix.ue }}
+      HOST_UPROJECT: ${{ vars.UNREAL_HOST_PROJECT }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install this extension into the host project (unreal-mcp-cli install-extension)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:HOST_UPROJECT)) { throw "UNREAL_HOST_PROJECT not set." }
+          $projectDir = Split-Path -Parent $env:HOST_UPROJECT
+          # install-extension's real signature is `install-extension <id> [path] --source <dir>`:
+          # <id> is a REQUIRED positional, the project path is POSITIONAL (there is no --path).
+          # Resolve <id> from extension.json and the plugin source dir (the dir holding the .uplugin).
+          $extId = (Get-Content (Join-Path $env:GITHUB_WORKSPACE 'extension.json') -Raw | ConvertFrom-Json).extensionId
+          $uplugin = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Recurse -Filter '*.uplugin' |
+            Where-Object { $_.FullName -notmatch '[\\/](Binaries|Intermediate|Saved)[\\/]' } | Select-Object -First 1
+          $pluginDir = $uplugin.Directory.FullName
+          # Install from the local checkout (--source) so the PR's exact source is exercised without a
+          # published GitHub Release (--source is the offline/CI escape hatch; mirrors godot-cli). --build
+          # compiles the extension into the host editor target now via UBT (Windows runner).
+          npx --yes unreal-mcp-cli install-extension "$extId" "$projectDir" --source "$pluginDir" --build
+          if ($LASTEXITCODE -ne 0) { throw "install-extension failed ($LASTEXITCODE)" }
+
+      - name: Boot the host editor wired to the local MCP server (background)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $projectDir = Split-Path -Parent $env:HOST_UPROJECT
+          # Launch the editor wired to a local MCP server in Custom mode (the supported "editor + bridge
+          # + local server" bring-up). `open` spawns the editor and returns; wait-for-ready then blocks
+          # until tools/list is answerable. The host .uproject (UNREAL_HOST_PROJECT) must already have the
+          # UnrealMCP core plugin installed (its bridge built / server pinned) — set up once per runner.
+          Start-Process -FilePath "npx" -ArgumentList @(
+            '--yes','unreal-mcp-cli','open',"$projectDir",'--start-server','--connection-mode','Custom'
+          ) -NoNewWindow
+          npx --yes unreal-mcp-cli wait-for-ready --path "$projectDir" --timeout 300000
+          if ($LASTEXITCODE -ne 0) { throw "MCP server not ready ($LASTEXITCODE)" }
+
+      - name: Run E2E tool checks against the live server
+        shell: pwsh
+        run: ./Tests/e2e/Run-ToolChecks.ps1 -ProjectDir (Split-Path -Parent $env:HOST_UPROJECT) -Cli "npx --yes unreal-mcp-cli"
+
+      - name: Stop the editor / MCP server
+        if: always()
+        shell: pwsh
+        run: |
+          npx --yes unreal-mcp-cli close (Split-Path -Parent $env:HOST_UPROJECT) 2>$null
+          exit 0

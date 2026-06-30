@@ -1,0 +1,12 @@
+{
+  "extensionId": "YOUR_EXTENSION_ID",
+  "name": "YOUR_EXTENSION_DISPLAY_NAME",
+  "description": "An AI Game Developer (Unreal-MCP) extension contributing MCP tools an AI agent can call against the Unreal Editor.",
+  "pluginName": "YOUR_EXTENSION_MODULE",
+  "repo": "YOUR_GITHUB_USERNAME_REPOSITORY",
+  "version": "0.1.0",
+  "minCoreVersion": "0.1.0",
+  "enginePlugins": [],
+  "tools": [],
+  "_comment": "Install-catalog / compatibility manifest, shaped as ONE unreal-mcp-cli ExtensionDescriptor (cli/src/utils/extensions-catalog.ts in Unreal-MCP) so it is directly liftable into the shared extensions.catalog.json { schemaVersion, extensions[] }. 'version' mirrors the .uplugin VersionName (kept in sync by commands/bump-version.ps1). 'minCoreVersion' is the lowest Unreal-MCP core version this extension supports (refreshed by commands/update-core.ps1). 'enginePlugins' are the gating engine plugins (e.g. ['Niagara']) enabled in the .uproject alongside this extension — populated by commands/init -FeaturePlugin. 'tools' lists the contributed tool ids/descriptions. The install-extension resolver unions enginePlugins with the materialized .uplugin Plugins[]."
+}

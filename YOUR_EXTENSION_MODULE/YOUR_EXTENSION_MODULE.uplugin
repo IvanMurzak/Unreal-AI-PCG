@@ -1,0 +1,30 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "YOUR_EXTENSION_DISPLAY_NAME",
+  "Description": "An AI Game Developer (Unreal-MCP) extension. Implements IUnrealMcpToolProvider and contributes MCP tools that an AI agent can call against the Unreal Editor.",
+  "Category": "AI",
+  "CreatedBy": "YOUR_GITHUB_USERNAME_REPOSITORY",
+  "CreatedByURL": "https://github.com/YOUR_GITHUB_USERNAME_REPOSITORY",
+  "DocsURL": "https://github.com/YOUR_GITHUB_USERNAME_REPOSITORY",
+  "MarketplaceURL": "",
+  "SupportURL": "https://github.com/YOUR_GITHUB_USERNAME_REPOSITORY/issues",
+  "CanContainContent": false,
+  "IsBetaVersion": true,
+  "IsExperimentalVersion": false,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "YOUR_EXTENSION_MODULE",
+      "Type": "Editor",
+      "LoadingPhase": "Default"
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "UnrealMCP",
+      "Enabled": true
+    }
+  ]
+}
