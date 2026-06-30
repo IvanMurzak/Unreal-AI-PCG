@@ -1,11 +1,11 @@
-// Copyright (c) 2026 YOUR_GITHUB_USERNAME_REPOSITORY. Licensed under the Apache License, Version 2.0.
+// Copyright (c) 2026 IvanMurzak/Unreal-AI-PCG. Licensed under the Apache License, Version 2.0.
 // See the LICENSE file in the repository root for more information.
 
 using UnrealBuildTool;
 
-public class YOUR_EXTENSION_MODULE : ModuleRules
+public class UnrealAIPCG : ModuleRules
 {
-	public YOUR_EXTENSION_MODULE(ReadOnlyTargetRules Target) : base(Target)
+	public UnrealAIPCG(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
@@ -38,8 +38,8 @@ public class YOUR_EXTENSION_MODULE : ModuleRules
 			// `commands/init.ps1 -FeaturePlugin <Name>` wires the matching { "Name": "<Feature>" } entry
 			// into the .uplugin "Plugins" array; uncomment the lines below to take a real code dependency.
 			//   e.g. for Niagara: "Niagara", "NiagaraEditor"
-			// "YOUR_FEATURE_MODULE",
-			// "YOUR_FEATURE_MODULEEditor",
+			"PCG",
+			"PCGEditor",
 		});
 	}
 }

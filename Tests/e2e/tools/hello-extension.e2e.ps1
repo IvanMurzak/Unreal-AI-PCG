@@ -2,7 +2,7 @@
 # Returned to Run-ToolChecks.ps1, which invokes `unreal-mcp-cli run-tool <Tool>` against the
 # running project's MCP server and asserts a well-formed success.
 @{
-    Tool   = "YOUR_TOOL_ID"
+    Tool   = "hello-extension"
     System = $false
     Input  = '{"name":"CI"}'
     Assert = {

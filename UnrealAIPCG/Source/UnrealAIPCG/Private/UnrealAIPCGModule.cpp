@@ -1,4 +1,4 @@
-// Copyright (c) 2026 YOUR_GITHUB_USERNAME_REPOSITORY. Licensed under the Apache License, Version 2.0.
+// Copyright (c) 2026 IvanMurzak/Unreal-AI-PCG. Licensed under the Apache License, Version 2.0.
 // See the LICENSE file in the repository root for more information.
 
 #include "Modules/ModuleManager.h"
@@ -7,7 +7,7 @@
 #include "IUnrealMcpToolProvider.h"
 #include "UnrealMcpToolRegistry.h"
 
-DEFINE_LOG_CATEGORY_STATIC(LogYOUR_EXTENSION_MODULE, Log, All);
+DEFINE_LOG_CATEGORY_STATIC(LogUnrealAIPCG, Log, All);
 
 /**
  * The extension's tool provider — an implementation of the Unreal-MCP extension contract
@@ -17,11 +17,11 @@ DEFINE_LOG_CATEGORY_STATIC(LogYOUR_EXTENSION_MODULE, Log, All);
  * Keep GetExtensionVersion() in sync with the .uplugin VersionName — `commands/bump-version.ps1`
  * updates both atomically.
  */
-class FYOUR_EXTENSION_MODULEProvider : public IUnrealMcpToolProvider
+class FUnrealAIPCGProvider : public IUnrealMcpToolProvider
 {
 public:
-	virtual FString GetExtensionId() const override { return TEXT("YOUR_EXTENSION_ID"); }
-	virtual FText GetDisplayName() const override { return NSLOCTEXT("YOUR_EXTENSION_MODULE", "DisplayName", "YOUR_EXTENSION_DISPLAY_NAME"); }
+	virtual FString GetExtensionId() const override { return TEXT("com.ivanmurzak.unreal-ai-pcg"); }
+	virtual FText GetDisplayName() const override { return NSLOCTEXT("UnrealAIPCG", "DisplayName", "Unreal AI PCG"); }
 	virtual FString GetExtensionVersion() const override { return TEXT("0.1.0"); }
 
 	virtual void RegisterTools(FUnrealMcpToolRegistry& Registry) override
@@ -34,10 +34,10 @@ public:
 		// guarantees it), so you may call editor / engine APIs directly. Return
 		// FUnrealMcpToolResult::Success(text, structuredJson) or ::Error(message).
 		//
-		// One sample tool ("YOUR_TOOL_ID") ships so the extension is end-to-end functional
+		// One sample tool ("hello-extension") ships so the extension is end-to-end functional
 		// out of the box. Replace it with your feature's real tools.
-		Registry.Tool(TEXT("YOUR_TOOL_ID"))
-			.Title(TEXT("YOUR_EXTENSION_DISPLAY_NAME — sample tool"))
+		Registry.Tool(TEXT("hello-extension"))
+			.Title(TEXT("Unreal AI PCG — sample tool"))
 			.Description(TEXT("Sample tool proving the IUnrealMcpToolProvider contract end-to-end. "
 			                  "Returns a friendly greeting, optionally addressed to 'name'. Replace with your own."))
 			.ParamString(TEXT("name"), TEXT("Who to greet. Defaults to 'world'."))
@@ -46,7 +46,7 @@ public:
 			.Handle([](const FUnrealMcpToolCall& Call) -> FUnrealMcpToolResult
 			{
 				const FString Name = Call.Has(TEXT("name")) ? Call.GetString(TEXT("name")) : TEXT("world");
-				const FString Greeting = FString::Printf(TEXT("Hello, %s! — from the YOUR_EXTENSION_DISPLAY_NAME extension."), *Name);
+				const FString Greeting = FString::Printf(TEXT("Hello, %s! — from the Unreal AI PCG extension."), *Name);
 
 				TSharedPtr<FJsonObject> Structured = MakeShared<FJsonObject>();
 				Structured->SetStringField(TEXT("greeting"), Greeting);
@@ -62,14 +62,14 @@ public:
  * revision bump on the Unreal-MCP side (the token-economy win: disabling the extension live-removes
  * its tools from the advertised set).
  */
-class FYOUR_EXTENSION_MODULEModule : public IModuleInterface
+class FUnrealAIPCGModule : public IModuleInterface
 {
 public:
 	virtual void StartupModule() override
 	{
-		Provider = MakeUnique<FYOUR_EXTENSION_MODULEProvider>();
+		Provider = MakeUnique<FUnrealAIPCGProvider>();
 		IModularFeatures::Get().RegisterModularFeature(IUnrealMcpToolProvider::GetModularFeatureName(), Provider.Get());
-		UE_LOG(LogYOUR_EXTENSION_MODULE, Log, TEXT("[YOUR_EXTENSION_MODULE] registered MCP tool provider '%s'."), *Provider->GetExtensionId());
+		UE_LOG(LogUnrealAIPCG, Log, TEXT("[UnrealAIPCG] registered MCP tool provider '%s'."), *Provider->GetExtensionId());
 	}
 
 	virtual void ShutdownModule() override
@@ -78,12 +78,12 @@ public:
 		{
 			IModularFeatures::Get().UnregisterModularFeature(IUnrealMcpToolProvider::GetModularFeatureName(), Provider.Get());
 			Provider.Reset();
-			UE_LOG(LogYOUR_EXTENSION_MODULE, Log, TEXT("[YOUR_EXTENSION_MODULE] unregistered MCP tool provider."));
+			UE_LOG(LogUnrealAIPCG, Log, TEXT("[UnrealAIPCG] unregistered MCP tool provider."));
 		}
 	}
 
 private:
-	TUniquePtr<FYOUR_EXTENSION_MODULEProvider> Provider;
+	TUniquePtr<FUnrealAIPCGProvider> Provider;
 };
 
-IMPLEMENT_MODULE(FYOUR_EXTENSION_MODULEModule, YOUR_EXTENSION_MODULE)
+IMPLEMENT_MODULE(FUnrealAIPCGModule, UnrealAIPCG)
