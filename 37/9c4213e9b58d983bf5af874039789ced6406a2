@@ -1,0 +1,19 @@
+UnrealAIPCG/Source/UnrealAIPCG/UnrealAIPCG.Build.cs
+  s_742c14f5f756cb::t_2415e22b0c0aff 36-42,44-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.4",
+  "base_commit_sha": "379c4213e9b58d983bf5af874039789ced6406a2",
+  "prompts": {},
+  "sessions": {
+    "s_742c14f5f756cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ab0ac7832a0d32a5c",
+        "model": "unknown"
+      },
+      "human_author": "Ivan Murzak <Ivan.D.Murzak@gmail.com>"
+    }
+  }
+}
