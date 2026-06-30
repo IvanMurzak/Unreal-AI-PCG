@@ -61,7 +61,7 @@ Extensions panel.
 UnrealAIPCG/                                  the UE plugin
 ├── UnrealAIPCG.uplugin                        descriptor; Type=Editor; Plugins: [ UnrealMCP, PCG ]
 └── Source/UnrealAIPCG/
-    ├── UnrealAIPCG.Build.cs                   deps: UnrealMcpRuntime + UnrealMcpEditor + PCG (+ PCG editor module)
+    ├── UnrealAIPCG.Build.cs                   deps: UnrealMcpRuntime + UnrealMcpEditor + PCG + AssetRegistry + UnrealEd
     └── Private/
         ├── UnrealAIPCGModule.cpp              the IUnrealMcpToolProvider + module; registers the tools
         └── Tests/UnrealAIPCGSpec.cpp          UE Automation specs (one It(...) per tool)
