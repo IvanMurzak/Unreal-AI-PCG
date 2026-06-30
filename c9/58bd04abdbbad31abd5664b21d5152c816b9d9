@@ -1,0 +1,19 @@
+UnrealAIPCG/Source/UnrealAIPCG/Private/Tests/UnrealAIPCGSpec.cpp
+  s_e3cea916442b5e::t_34d2f1bb8edd67 9,15,17-21,32,47-61,84,86,89,91,93-94,98-173
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.4",
+  "base_commit_sha": "c958bd04abdbbad31abd5664b21d5152c816b9d9",
+  "prompts": {},
+  "sessions": {
+    "s_e3cea916442b5e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c575ab56-73e6-4952-bb8b-fef415924e27",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Ivan Murzak <Ivan.D.Murzak@gmail.com>"
+    }
+  }
+}
