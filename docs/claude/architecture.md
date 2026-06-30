@@ -28,10 +28,10 @@ context cost, so users enable only what a task needs.
 
 | Path | What |
 | --- | --- |
-| `YOUR_EXTENSION_MODULE/YOUR_EXTENSION_MODULE.uplugin` | Descriptor. `VersionName` = the version single source. `Plugins` lists the core + gating engine plugin. Module is `Type=Editor`. |
-| `.../Source/YOUR_EXTENSION_MODULE/YOUR_EXTENSION_MODULE.Build.cs` | Module rules. Deps: `UnrealMcpRuntime` + `UnrealMcpEditor` (required) + your feature modules (commented placeholder). |
-| `.../Private/YOUR_EXTENSION_MODULEModule.cpp` | The provider (`GetExtensionId/DisplayName/Version`, `RegisterTools`) + the editor module that registers it. One sample tool. |
-| `.../Private/Tests/YOUR_EXTENSION_MODULESpec.cpp` | Sample UE Automation spec (guarded by `WITH_DEV_AUTOMATION_TESTS`). One `It(...)` per tool. |
+| `UnrealAIPCG/UnrealAIPCG.uplugin` | Descriptor. `VersionName` = the version single source. `Plugins` lists the core + gating engine plugin. Module is `Type=Editor`. |
+| `.../Source/UnrealAIPCG/UnrealAIPCG.Build.cs` | Module rules. Deps: `UnrealMcpRuntime` + `UnrealMcpEditor` (required) + your feature modules (commented placeholder). |
+| `.../Private/UnrealAIPCGModule.cpp` | The provider (`GetExtensionId/DisplayName/Version`, `RegisterTools`) + the editor module that registers it. One sample tool. |
+| `.../Private/Tests/UnrealAIPCGSpec.cpp` | Sample UE Automation spec (guarded by `WITH_DEV_AUTOMATION_TESTS`). One `It(...)` per tool. |
 | `Tests/e2e/` | E2E `unreal-mcp-cli` tool checks (one per tool) + the `Run-ToolChecks.ps1` harness. |
 | `extension.json` | Install-catalog / compatibility manifest: `version` (mirrors `.uplugin`), `minCoreVersion`. |
 | `commands/` | `init` (PowerShell + Python), `bump-version`, `get-version`, `update-core`. |
@@ -41,7 +41,7 @@ context cost, so users enable only what a task needs.
 `commands/init.ps1` / `commands/init.py`:
 1. Replaces placeholder tokens in file **content** across the tree (excluding `commands/`, VCS, and
    build artifacts).
-2. Renames files/folders containing `YOUR_EXTENSION_MODULE` (deepest-first).
+2. Renames files/folders containing `UnrealAIPCG` (deepest-first).
 3. If `-FeaturePlugin` is given, inserts it into the `.uplugin` `Plugins` array and uncomments the
    feature-module dependencies in the `*.Build.cs`.
 4. Activates the `*.yml-sample` workflows.

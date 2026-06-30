@@ -1,12 +1,18 @@
 {
-  "extensionId": "YOUR_EXTENSION_ID",
-  "name": "YOUR_EXTENSION_DISPLAY_NAME",
-  "description": "An AI Game Developer (Unreal-MCP) extension contributing MCP tools an AI agent can call against the Unreal Editor.",
-  "pluginName": "YOUR_EXTENSION_MODULE",
-  "repo": "YOUR_GITHUB_USERNAME_REPOSITORY",
+  "extensionId": "com.ivanmurzak.unreal-ai-pcg",
+  "name": "Unreal AI PCG",
+  "description": "PCG (Procedural Content Generation) tools for AI agents: list and inspect PCG graphs, and add, inspect and generate PCG components on actors in the editor world.",
+  "pluginName": "UnrealAIPCG",
+  "repo": "IvanMurzak/Unreal-AI-PCG",
   "version": "0.1.0",
   "minCoreVersion": "0.1.0",
-  "enginePlugins": [],
-  "tools": [],
+  "enginePlugins": ["PCG"],
+  "tools": [
+    { "name": "pcg-list-graphs", "description": "Lists every PCG graph (UPCGGraph) asset in the project via the Asset Registry, without loading any of them. Optionally filter by a content-path prefix." },
+    { "name": "pcg-get-graph", "description": "Inspects a single PCG graph asset (read-only) and reports its nodes." },
+    { "name": "pcg-add-component", "description": "Adds a UPCGComponent to a named actor in the active editor world, optionally bound to a PCG graph asset." },
+    { "name": "pcg-get-component", "description": "Inspects the UPCGComponent on a named actor in the active editor world (read-only): its bound graph and generation state." },
+    { "name": "pcg-generate", "description": "Triggers PCG generation (refresh) on the UPCGComponent of a named actor in the active editor world." }
+  ],
   "_comment": "Install-catalog / compatibility manifest, shaped as ONE unreal-mcp-cli ExtensionDescriptor (cli/src/utils/extensions-catalog.ts in Unreal-MCP) so it is directly liftable into the shared extensions.catalog.json { schemaVersion, extensions[] }. 'version' mirrors the .uplugin VersionName (kept in sync by commands/bump-version.ps1). 'minCoreVersion' is the lowest Unreal-MCP core version this extension supports (refreshed by commands/update-core.ps1). 'enginePlugins' are the gating engine plugins (e.g. ['Niagara']) enabled in the .uproject alongside this extension — populated by commands/init -FeaturePlugin. 'tools' lists the contributed tool ids/descriptions. The install-extension resolver unions enginePlugins with the materialized .uplugin Plugins[]."
 }
