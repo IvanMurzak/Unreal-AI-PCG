@@ -1,0 +1,40 @@
+Tests/e2e/tools/pcg-get-graph.e2e.ps1
+  s_e3cea916442b5e::t_2c1f93864af0df 1-18
+extension.json
+  s_e3cea916442b5e::t_5fb647316a1752 4
+  s_742c14f5f756cb::t_ffb6d23cefaf29 10-16
+Tests/e2e/tools/pcg-generate.e2e.ps1
+  s_e3cea916442b5e::t_dec31e2c061f27 1-18
+README.md
+  s_e3cea916442b5e::t_4707dcb3d7638c 64
+Tests/e2e/tools/pcg-list-graphs.e2e.ps1
+  s_e3cea916442b5e::t_7534d2f71f0147 1-17
+Tests/e2e/tools/pcg-get-component.e2e.ps1
+  s_e3cea916442b5e::t_bf259a6509a1b0 1-17
+Tests/e2e/tools/pcg-add-component.e2e.ps1
+  s_e3cea916442b5e::t_50f65cbf54226e 1-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.4",
+  "base_commit_sha": "e87d4ea8cf8e8cb051c5d55bbed3fe03dc844d41",
+  "prompts": {},
+  "sessions": {
+    "s_742c14f5f756cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ab0ac7832a0d32a5c",
+        "model": "unknown"
+      },
+      "human_author": "Ivan Murzak <Ivan.D.Murzak@gmail.com>"
+    },
+    "s_e3cea916442b5e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c575ab56-73e6-4952-bb8b-fef415924e27",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Ivan Murzak <Ivan.D.Murzak@gmail.com>"
+    }
+  }
+}
