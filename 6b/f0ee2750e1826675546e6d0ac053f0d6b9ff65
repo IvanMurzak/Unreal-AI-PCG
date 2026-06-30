@@ -1,0 +1,35 @@
+README.md
+  s_e3cea916442b5e::t_ee7d4b4d68292e 1,4,6-7,12-16,18-20,22,24-26,28-34,36-37,39,41-42,45-46,48-50,52-56,58,60-72,74,76,79-80,82,86,89,92-95,97,107-109,111,116-117,120-121
+CLAUDE.md
+  s_e3cea916442b5e::t_9b6f9375379ec4 1,3-7,9-10,12-29,37,49-52,56-57,59-61,63,65-66,71-72
+Tests/e2e/tools/hello-extension.e2e.ps1
+  s_e3cea916442b5e::t_9d9b02f7e0305b 5
+UnrealAIPCG/Source/UnrealAIPCG/Private/Tests/UnrealAIPCGSpec.cpp
+  s_e3cea916442b5e::t_1e2c91e0d8c5f4 1,18,24,30,37,46,48,50,56,61,66,70,81,86
+UnrealAIPCG/Source/UnrealAIPCG/Private/UnrealAIPCGModule.cpp
+  s_e3cea916442b5e::t_00da1fd0eae5c1 1,10,20,23-24,37,39-40,49,65,70,72,81,86,89
+UnrealAIPCG/Source/UnrealAIPCG/UnrealAIPCG.Build.cs
+  s_e3cea916442b5e::t_420ddfe193fb83 1,6,8,41-42
+UnrealAIPCG/UnrealAIPCG.uplugin
+  s_e3cea916442b5e::t_f15f4df68ea387 5,8-10,12,19,28-31
+docs/claude/architecture.md
+  s_e3cea916442b5e::t_16b31475f31cb7 31-34,44
+extension.json
+  s_e3cea916442b5e::t_1385bfd84363d0 2-3,5-6,9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.4",
+  "base_commit_sha": "6bf0ee2750e1826675546e6d0ac053f0d6b9ff65",
+  "prompts": {},
+  "sessions": {
+    "s_e3cea916442b5e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c575ab56-73e6-4952-bb8b-fef415924e27",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Ivan Murzak <Ivan.D.Murzak@gmail.com>"
+    }
+  }
+}
