@@ -60,6 +60,88 @@ jobs:
           echo "module=$module" >> $env:GITHUB_OUTPUT
           echo "Resolved plugin '$module' at $($uplugin.Directory.FullName)"
 
+      # ── Self-heal the host's UnrealMCP plugin BEFORE UBT reads the makefile ──────
+      # The host .uproject requires the UnrealMCP core plugin (enabled). Its
+      # Plugins\UnrealMCP is a junction that, by the core CI's convention, points at the
+      # per-run BuildPlugin output under $RUNNER_TEMP\UnrealMCP-Package — an EPHEMERAL
+      # location that GitHub Actions clears at job teardown. When it is cleared (or this
+      # job lands on a self-hosted runner where core CI never ran), the junction dangles
+      # and UBT fails makefile generation in ~4s with "Unable to find plugin 'UnrealMCP'"
+      # (Result: Failed (OtherCompilationError)) BEFORE any extension code compiles.
+      # This step GUARANTEES a valid UnrealMCP source is junctioned in, independent of
+      # core CI timing / which runner we land on. Mirrors the core Unreal-MCP CI
+      # self-heal (test_pull_request.yml, PR #185). MUST hard-fail if it cannot make the
+      # junction valid — a silent failure would just red the build later with the same
+      # confusing makefile error.
+      - name: Self-heal host UnrealMCP plugin junction
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:HOST_UPROJECT)) {
+            throw "UNREAL_HOST_PROJECT repo variable is not set — the host build needs a host .uproject with the UnrealMCP plugin enabled."
+          }
+          $hostPlugins = Join-Path (Split-Path -Parent $env:HOST_UPROJECT) 'Plugins'
+          New-Item -ItemType Directory -Force -Path $hostPlugins | Out-Null
+          $mcpLink = Join-Path $hostPlugins 'UnrealMCP'
+
+          function Test-McpSource([string]$dir) {
+            return (-not [string]::IsNullOrWhiteSpace($dir)) -and (Test-Path -LiteralPath (Join-Path $dir 'UnrealMCP.uplugin'))
+          }
+
+          # Preference 1: a fresh core BuildPlugin package left in THIS runner's RUNNER_TEMP
+          # (present only right after a core CI run on the same runner — matches core's convention).
+          $mcpSource = $null
+          $freshPackage = Join-Path $env:RUNNER_TEMP 'UnrealMCP-Package'
+          if (Test-McpSource $freshPackage) {
+            $mcpSource = $freshPackage
+            Write-Host "UnrealMCP source: fresh core BuildPlugin package -> $mcpSource"
+          } else {
+            # Preference 2: a STABLE clone of the public core repo kept next to the host project
+            # (persists across jobs/runners on this machine; refreshed to the core default branch,
+            # which the extensions track — they pin no specific UnrealMCP version). UBT compiles the
+            # plugin from source as part of the host editor target build, so raw source is sufficient.
+            $srcRoot   = Join-Path (Split-Path -Parent (Split-Path -Parent $env:HOST_UPROJECT)) 'UnrealMCP-src'
+            $repoDir   = Join-Path $srcRoot 'Unreal-MCP'
+            $pluginDir = Join-Path $repoDir 'UnrealMCP'
+            $repoUrl   = 'https://github.com/IvanMurzak/Unreal-MCP.git'
+            if (Test-McpSource $pluginDir) {
+              Write-Host "Refreshing stable UnrealMCP clone at $repoDir (core default branch)"
+              try {
+                git -C "$repoDir" fetch --depth 1 origin HEAD 2>&1 | Write-Host
+                git -C "$repoDir" reset --hard FETCH_HEAD 2>&1 | Write-Host
+              } catch {
+                Write-Host "WARN: refresh failed ($($_.Exception.Message)); reusing the existing clone."
+              }
+            } else {
+              Write-Host "Cloning stable UnrealMCP source into $repoDir (core default branch)"
+              if (Test-Path -LiteralPath $repoDir) { cmd /c rmdir /s /q "$repoDir" 2>$null }
+              New-Item -ItemType Directory -Force -Path $srcRoot | Out-Null
+              git clone --depth 1 "$repoUrl" "$repoDir" 2>&1 | Write-Host
+              if ($LASTEXITCODE -ne 0) { throw "Failed to clone $repoUrl (exit $LASTEXITCODE)." }
+            }
+            if (-not (Test-McpSource $pluginDir)) {
+              throw "Stable UnrealMCP clone is invalid — no UnrealMCP.uplugin under $pluginDir."
+            }
+            $mcpSource = $pluginDir
+            Write-Host "UnrealMCP source: stable clone -> $mcpSource"
+          }
+
+          # (Re)create the host Plugins\UnrealMCP junction idempotently: drop any existing
+          # reparse point / dir first (unlink only — never recurse into the target), then mklink /J.
+          if (Test-Path -LiteralPath $mcpLink) {
+            cmd /c rmdir "$mcpLink" 2>$null
+            if (Test-Path -LiteralPath $mcpLink) { Remove-Item -LiteralPath $mcpLink -Recurse -Force }
+          }
+          cmd /c mklink /J "$mcpLink" "$mcpSource" | Write-Host
+          if ($LASTEXITCODE -ne 0) { throw "Failed to (re)create host junction $mcpLink -> $mcpSource (exit $LASTEXITCODE)." }
+
+          # Hard-verify UBT will resolve the plugin: the junction must expose UnrealMCP.uplugin.
+          $resolved = Join-Path $mcpLink 'UnrealMCP.uplugin'
+          if (-not (Test-Path -LiteralPath $resolved)) {
+            throw "Host UnrealMCP junction still invalid — $resolved not found after provisioning."
+          }
+          Write-Host "Host UnrealMCP plugin ready: $mcpLink -> $mcpSource"
+
       # NOTE: there is deliberately NO standalone `BuildPlugin -Rocket` step. An extension
       # depends on the UnrealMCP plugin, and standalone BuildPlugin builds in an isolated
       # HostProject that CANNOT resolve UnrealMCP unless it is engine-installed into
