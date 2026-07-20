@@ -169,13 +169,13 @@ jobs:
     if: needs.check-version-tag.outputs.tag_exists == 'false'
     steps:
       - name: Download release notes
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: release-notes
           path: ./release-notes
 
       - name: Download plugin source zip
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: plugin-zip
           path: ./assets
