@@ -43,7 +43,7 @@ jobs:
       HOST_UPROJECT: ${{ vars.UNREAL_HOST_PROJECT }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
 
@@ -209,7 +209,7 @@ jobs:
 
       - name: Upload Automation report on failure
         if: ${{ failure() && env.REPORT_DIR != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: automation-report-ue-${{ inputs.ue }}
           path: ${{ env.REPORT_DIR }}

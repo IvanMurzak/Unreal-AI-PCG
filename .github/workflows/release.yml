@@ -44,7 +44,7 @@ jobs:
       tag_exists: ${{ steps.tag_exists.outputs.exists }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -78,7 +78,7 @@ jobs:
     if: needs.check-version-tag.outputs.tag_exists == 'false'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -106,7 +106,7 @@ jobs:
           } > release.md
 
       - name: Upload release notes artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-notes
           path: ./release.md
@@ -135,7 +135,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
 
@@ -155,7 +155,7 @@ jobs:
           echo "Packaged $zip"
 
       - name: Upload plugin source zip artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: plugin-zip
           path: ${{ steps.pkg.outputs.zip }}
@@ -169,13 +169,13 @@ jobs:
     if: needs.check-version-tag.outputs.tag_exists == 'false'
     steps:
       - name: Download release notes
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: release-notes
           path: ./release-notes
 
       - name: Download plugin source zip
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: plugin-zip
           path: ./assets
@@ -184,7 +184,7 @@ jobs:
         run: ls -la ./assets ./release-notes
 
       - name: Create Tag and Release with the source zip
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.check-version-tag.outputs.tag }}
           name: ${{ needs.check-version-tag.outputs.version }}
