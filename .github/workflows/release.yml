@@ -34,9 +34,22 @@ on:
 permissions:
   contents: write
 
+# Serialises release runs per ref so two releases can never publish concurrently.
+# `cancel-in-progress` is deliberately UNSET: an in-flight release may already have created the tag
+# and GitHub Release, so it must be allowed to finish. `queue: max` raises the pending queue from the
+# default 1 to 100 — without it a queued release is silently cancelled and replaced by the next
+# trigger, which is how one version can be published while an earlier one never runs at all.
+# NOTE: `queue: max` together with `cancel-in-progress: true` is a workflow validation error.
+concurrency:
+  group: release-${{ github.ref }}
+  queue: max
+
 jobs:
   check-version-tag:
     runs-on: ubuntu-latest
+    # Observed 4-9 s across all 8 historical runs (full-history checkout + fetch-tags + the two tag
+    # actions). 10 min is runaway insurance for the network legs, against GitHub's 360 min default.
+    timeout-minutes: 10
     outputs:
       version: ${{ steps.get_version.outputs.version }}
       tag: ${{ steps.get_version.outputs.tag }}
@@ -74,6 +87,9 @@ jobs:
 
   prepare-release-notes:
     runs-on: ubuntu-latest
+    # Observed 5-6 s on every run that reached it (full-history checkout + a `git log` + an artifact
+    # upload). 10 min is the anti-flake floor, covering the artifact-upload network leg.
+    timeout-minutes: 10
     needs: [check-version-tag]
     if: needs.check-version-tag.outputs.tag_exists == 'false'
     steps:
@@ -119,6 +135,14 @@ jobs:
   # generated UHT codegen is reused by the 5.8 compile -> C2440/C2078). The extension itself
   # compiles on 5.8; the blocker is host build hygiene. Re-add `test-ue-5-8` (job + the
   # `release` needs) once the runner provides a per-UE-version UnrealMCP.
+  #
+  # NOTE: no `timeout-minutes` on this job. It calls a reusable workflow (`uses:`), and a caller job
+  # rejects `timeout-minutes` with a hard workflow validation error — the bound has to live on the
+  # `build-and-test` job INSIDE test_unreal_plugin.yml, which is outside this change's two-file diff.
+  # That job runs on the [self-hosted, windows, unreal] pool and is therefore the ONE job in the
+  # release graph still unbounded; observed 41-59 s on the two runs that reached it, but a real UE
+  # host build is long and self-hosted queue time does not count toward `timeout-minutes` anyway.
+  # Bounding it is a follow-up, not a gap introduced here.
   test-ue-5-7:
     needs: [check-version-tag]
     if: needs.check-version-tag.outputs.tag_exists == 'false'
@@ -133,6 +157,9 @@ jobs:
     needs: [check-version-tag]
     if: needs.check-version-tag.outputs.tag_exists == 'false'
     runs-on: ubuntu-latest
+    # Observed 5-6 s on every run that reached it (checkout + `git archive` + artifact upload). No UE
+    # and no self-hosted runner by design, so this is a pure ubuntu job; 10 min is the anti-flake floor.
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -164,6 +191,10 @@ jobs:
   # release (mirrors Unity's atomic release-unity-plugin).
   release:
     runs-on: ubuntu-latest
+    # Observed 8 s and 10 s on the two runs that cut a real Release. The extra headroom over the 10 min
+    # floor covers the third-party network legs this job does not control: two artifact downloads and
+    # the softprops/action-gh-release tag creation + asset upload.
+    timeout-minutes: 15
     needs:
       [check-version-tag, prepare-release-notes, test-ue-5-7, package]
     if: needs.check-version-tag.outputs.tag_exists == 'false'
