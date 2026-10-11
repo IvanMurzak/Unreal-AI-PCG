@@ -145,9 +145,9 @@ jobs:
       # NOTE: there is deliberately NO standalone `BuildPlugin -Rocket` step. An extension
       # depends on the UnrealMCP plugin, and standalone BuildPlugin builds in an isolated
       # HostProject that CANNOT resolve UnrealMCP unless it is engine-installed into
-      # UE_ROOT\Engine\Plugins\Marketplace (see docs/claude/release.md). The per-UE compile
+      # UE_ROOT\Engine\Plugins\Marketplace (see docs/agents/release.md). The per-UE compile
       # validation is the host-editor-target build below, which resolves UnrealMCP via the
-      # host project (UNREAL_HOST_PROJECT) — matching the documented design (docs/claude/ci.md:
+      # host project (UNREAL_HOST_PROJECT) — matching the documented design (docs/agents/ci.md:
       # "Build the plugin via UBT against the host project").
       - name: Build host editor target (junction this extension into the host project)
         shell: pwsh

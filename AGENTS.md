@@ -14,7 +14,7 @@ Scaffolded from `IvanMurzak/Unreal-AI-Template`, but now its own extension — d
 - `commands/` — `bump-version`, `get-version`, `update-core`; `init` was the one-time scaffold (not rerun).
 - `extension.json` — install-catalog manifest (`version`, `minCoreVersion`, `enginePlugins`, `tools[]`).
 - `.github/workflows/` — `test_pull_request.yml` (calls `test_unreal_plugin.yml` + E2E), version-gated `release.yml`, `bump_version.yml`.
-- `docs/claude/` — `architecture.md` (extension shape, contract), `ci.md` (workflows, repo variables,
+- `docs/agents/` — `architecture.md` (extension shape, contract), `ci.md` (workflows, repo variables,
   self-hosted runner gating), `release.md` (version gate, atomic source-zip release).
 - `README.md` — user-facing tools / install / layout / develop / release / CI.
 

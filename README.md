@@ -124,7 +124,7 @@ they stay *skipped* until a runner is registered and the repo variables are set:
 - `UNREAL_E2E_READY = true` — enables the E2E `install-extension` + tool-invocation leg.
 - `UNREAL_HOST_PROJECT` — absolute path on the runner to a host `.uproject` with UnrealMCP available.
 
-See [`docs/claude/ci.md`](docs/claude/ci.md) and [`docs/claude/release.md`](docs/claude/release.md).
+See [`docs/agents/ci.md`](docs/agents/ci.md) and [`docs/agents/release.md`](docs/agents/release.md).
 
 ## License
 
