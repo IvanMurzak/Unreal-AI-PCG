@@ -21,9 +21,9 @@
 #     jobs fail ("Failed to (re)create host junction") and leaked extension junctions into the
 #     core's tool-contract smoke. A missing host is bootstrapped from the machine's canonical
 #     host template (optional vars.UNREAL_HOST_TEMPLATE, default
-#     C:\actions-runner-unreal\host\UnrealTestProject; sources only). This workflow junctions
-#     THIS extension into the host's Plugins/, builds the host editor target so the specs
-#     compile in, and unlinks that junction again at job end.
+#     C:\actions-runner-unreal\host\UnrealTestProject; Source/Config/.uproject only). This
+#     workflow junctions THIS extension into the host's Plugins/, builds the host editor
+#     target so the specs compile in, and unlinks that junction again at job end.
 name: test-unreal-plugin
 
 on:
@@ -71,9 +71,10 @@ jobs:
       # ── This repository's OWN host project (never the shared core host) ───────────
       # A per-repo host has exactly one writer per machine (the one runner this repository
       # registers there), so jobs of different repositories can run at the same time. Bootstrap
-      # copies only the template's sources (no Binaries/Intermediate/Saved/DDC/Plugins, never
-      # through a junction) into a staging dir and renames it into place, so an interrupted copy
-      # never leaves a half-made host behind.
+      # copies only Source/Config/.uproject (not Content, which the core's specs write assets
+      # into; not Binaries/Intermediate/Saved/DDC/Plugins; never through a junction) into a
+      # staging dir and renames it into place, so an interrupted copy never leaves a half-made
+      # host behind.
       - name: Bootstrap this repository's own host project (if missing)
         shell: pwsh
         run: |
@@ -98,11 +99,18 @@ jobs:
           if (Test-Path -LiteralPath $staging) { cmd /c rmdir /s /q "$staging" }
           New-Item -ItemType Directory -Force -Path (Split-Path -Parent $hostDir) | Out-Null
           Write-Host "Bootstrapping $hostDir from $templateDir"
-          robocopy "$templateDir" "$staging" /E /XJ /XD Binaries Intermediate Saved DerivedDataCache Plugins .vs /R:2 /W:2 /NFL /NDL /NP
+          robocopy "$templateDir" "$staging" /E /XJ /XD Binaries Intermediate Saved DerivedDataCache Plugins Content .vs /R:2 /W:2 /NFL /NDL /NP
           if ($LASTEXITCODE -ge 8) { throw "robocopy $templateDir -> $staging failed (exit $LASTEXITCODE)." }
           Move-Item -LiteralPath $staging -Destination $hostDir
           Write-Host "Host project bootstrapped: $env:HOST_UPROJECT"
           exit 0  # robocopy's 1..7 are success codes; do not let pwsh re-raise them
+
+      # A run of THIS repository that was cancelled or lost its runner can leave UnrealEditor-Cmd /
+      # UBT / ShaderCompileWorker alive, holding this host's DLLs open. Only processes whose command
+      # line references this repository's own host dir (and their descendants) are stopped.
+      - name: Stop UE processes an interrupted earlier run left on this host
+        shell: pwsh
+        run: ./.github/scripts/stop-host-processes.ps1 -HostDir (Split-Path -Parent $env:HOST_UPROJECT)
 
       # ── Self-heal the host's UnrealMCP plugin BEFORE UBT reads the makefile ──────
       # The host .uproject requires the UnrealMCP core plugin (enabled). Its
@@ -265,8 +273,10 @@ jobs:
         # core + the other Unreal-AI-* extensions) and its RUNNER_TEMP + the persistent
         # runner-local host project are NOT auto-pruned after a job, so this job's Automation
         # report and the host's transient logs/crashes accumulate across runs. Remove ONLY
-        # THIS job's own regenerable outputs, and unlink THIS job's own host junction so no
-        # extension junction outlives its job. Deliberately NOT touched:
+        # THIS job's own regenerable outputs, stop the UE processes it started (editor, UBT,
+        # ShaderCompileWorker: everything referencing this repo's host, plus descendants), and
+        # unlink THIS job's own host junction so no extension junction outlives its job.
+        # Deliberately NOT touched:
         #   * host DerivedDataCache / Intermediate / Binaries - a persistent per-repo speed
         #     cache; deleting it forces a full shader/host recompile every run.
         #   * the host Plugins\UnrealMCP junction - re-validated by the self-heal step every run.
@@ -285,7 +295,12 @@ jobs:
             cmd /c rmdir /s /q "$p" 2>$null
             if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue }
           }
-          # 0. This job's Plugins\<module> junction. Delete() on a junction removes the link
+          # 0. UE processes this job started against its host (never another repository's).
+          $reaper = Join-Path $env:GITHUB_WORKSPACE '.github\scripts\stop-host-processes.ps1'
+          if (-not [string]::IsNullOrWhiteSpace($env:HOST_UPROJECT) -and (Test-Path -LiteralPath $reaper)) {
+            & $reaper -HostDir (Split-Path -Parent $env:HOST_UPROJECT)
+          }
+          # 0b. This job's Plugins\<module> junction. Delete() on a junction removes the link
           #    only; it never recurses into the target (this job's checkout).
           if (-not [string]::IsNullOrWhiteSpace($env:HOST_UPROJECT) -and -not [string]::IsNullOrWhiteSpace($env:MODULE)) {
             $link = Join-Path (Split-Path -Parent $env:HOST_UPROJECT) "Plugins\$env:MODULE"

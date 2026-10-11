@@ -111,6 +111,9 @@ jobs:
         shell: pwsh
         run: |
           npx --yes unreal-mcp-cli close (Split-Path -Parent $env:HOST_UPROJECT) 2>$null
+          # Then stop anything still referencing this repository's own host (editor, UBT,
+          # ShaderCompileWorker, the local server) - never another repository's processes.
+          ./.github/scripts/stop-host-processes.ps1 -HostDir (Split-Path -Parent $env:HOST_UPROJECT)
           exit 0
 
       - name: Cleanup this job's build outputs (self-hosted disk hygiene)

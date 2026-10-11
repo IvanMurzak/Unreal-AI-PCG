@@ -39,11 +39,17 @@ serialize across repos, so isolation is by path instead:
   machine, so each host has exactly one writer. If you add a second runner for the same repository
   on one machine, it needs its own host too.
 - `test_unreal_plugin.yml` refuses the shared template path and, when the host is missing, copies the
-  template's sources (`Source/`, `Config/`, `Content/`, `.uproject`; no `Binaries`, `Intermediate`,
-  `Saved`, `DerivedDataCache` or `Plugins`) into place. Disk cost: one host `Intermediate`
+  template's `Source/`, `Config/` and `.uproject` into place (not `Content`, which the core's specs
+  write assets into; not `Binaries`, `Intermediate`, `Saved`, `DerivedDataCache` or `Plugins`).
+  Disk cost: one host `Intermediate`
   (~2.5 GB per UE version, mostly the UnrealEd shared PCH) plus one `UnrealMCP-src` clone per repo.
 - The job's always-run cleanup unlinks its own `Plugins\<Module>` junction (the link only, never the
   target), so no extension junction outlives its job.
+- Processes: `.github/scripts/stop-host-processes.ps1` stops every process whose command line references
+  this repository's host dir (UnrealEditor-Cmd, UBT, ShaderCompileWorker, the E2E server) plus its
+  descendants. It runs before the build, to clear what an interrupted earlier run left behind, and again
+  in the always-run cleanup. Per-repo hosts guarantee it never matches another repository's job.
+  Persistent workspaces and build caches (`Intermediate`, `Binaries`, DDC, `UnrealMCP-src`) are kept on purpose.
 
 Fork PRs never run on the self-hosted runner (`head.repo.full_name == github.repository` guard); a
 fork PR's checked-out code must not execute on your machine.
