@@ -15,8 +15,9 @@ release, and a manual bump workflow.
 
 ## Self-hosted runner gating (never red-by-absence)
 
-The UBT/Automation/E2E legs run on a **self-hosted Windows UE runner** (label
-`[self-hosted, windows, unreal]`). They are gated so they **skip** — never fail a PR — until you
+The UBT/Automation/E2E legs run on a **self-hosted Windows UE runner** (labels
+`[self-hosted, windows, unreal-<ue>]`, e.g. `unreal-5-7`; label each runner with one `unreal-X-Y` per UE version
+installed on its machine, so a job only lands where its engine exists). They are gated so they **skip** — never fail a PR — until you
 register a runner and set repository variables:
 
 | Variable | Enables |

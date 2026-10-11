@@ -53,7 +53,13 @@ jobs:
   e2e:
     name: e2e tool-invocation (UE ${{ matrix.ue }})
     if: ${{ vars.UNREAL_E2E_READY == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-    runs-on: [self-hosted, windows, unreal]
+    # Versioned runner label (unreal-5-7 for UE 5.7): the job only lands on a machine that has
+    # this engine installed. Expressions have no replace(), hence the lookup; an unmapped
+    # version yields e.g. `unreal-5.10`, which no runner carries (add it to the map).
+    runs-on:
+      - self-hosted
+      - windows
+      - ${{ fromJSON('{"5.5":"unreal-5-5","5.6":"unreal-5-6","5.7":"unreal-5-7","5.8":"unreal-5-8","5.9":"unreal-5-9"}')[matrix.ue] || format('unreal-{0}', matrix.ue) }}
     strategy:
       fail-fast: false
       matrix:

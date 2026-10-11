@@ -139,7 +139,7 @@ jobs:
   # NOTE: no `timeout-minutes` on this job. It calls a reusable workflow (`uses:`), and a caller job
   # rejects `timeout-minutes` with a hard workflow validation error — the bound has to live on the
   # `build-and-test` job INSIDE test_unreal_plugin.yml, which is outside this change's two-file diff.
-  # That job runs on the [self-hosted, windows, unreal] pool and is therefore the ONE job in the
+  # That job runs on the [self-hosted, windows, unreal-<ue>] pool and is therefore the ONE job in the
   # release graph still unbounded; observed 41-59 s on the two runs that reached it, but a real UE
   # host build is long and self-hosted queue time does not count toward `timeout-minutes` anyway.
   # Bounding it is a follow-up, not a gap introduced here.
