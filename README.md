@@ -122,7 +122,9 @@ they stay *skipped* until a runner is registered and the repo variables are set:
 
 - `UNREAL_RUNNER_READY = true` — enables the UBT build + Automation legs.
 - `UNREAL_E2E_READY = true` — enables the E2E `install-extension` + tool-invocation leg.
-- `UNREAL_HOST_PROJECT` — absolute path on the runner to a host `.uproject` with UnrealMCP available.
+- `UNREAL_HOST_PROJECT` — absolute path on the runner to THIS repository's own host `.uproject`
+  (e.g. `C:\actions-runner-unreal\host-<repo>\UnrealTestProject\UnrealTestProject.uproject`); never
+  shared with another repository. CI bootstraps it if missing (see `docs/agents/ci.md`).
 
 See [`docs/agents/ci.md`](docs/agents/ci.md) and [`docs/agents/release.md`](docs/agents/release.md).
 

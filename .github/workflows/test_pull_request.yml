@@ -53,7 +53,13 @@ jobs:
   e2e:
     name: e2e tool-invocation (UE ${{ matrix.ue }})
     if: ${{ vars.UNREAL_E2E_READY == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-    runs-on: [self-hosted, windows, unreal]
+    # Versioned runner label (unreal-5-7 for UE 5.7): the job only lands on a machine that has
+    # this engine installed. Expressions have no replace(), hence the lookup; an unmapped
+    # version yields e.g. `unreal-5.10`, which no runner carries (add it to the map).
+    runs-on:
+      - self-hosted
+      - windows
+      - ${{ fromJSON('{"5.5":"unreal-5-5","5.6":"unreal-5-6","5.7":"unreal-5-7","5.8":"unreal-5-8","5.9":"unreal-5-9"}')[matrix.ue] || format('unreal-{0}', matrix.ue) }}
     strategy:
       fail-fast: false
       matrix:
@@ -93,8 +99,9 @@ jobs:
           $projectDir = Split-Path -Parent $env:HOST_UPROJECT
           # Launch the editor wired to a local MCP server in Custom mode (the supported "editor + bridge
           # + local server" bring-up). `open` spawns the editor and returns; wait-for-ready then blocks
-          # until tools/list is answerable. The host .uproject (UNREAL_HOST_PROJECT) must already have the
-          # UnrealMCP core plugin installed (its bridge built / server pinned) — set up once per runner.
+          # until tools/list is answerable. The host .uproject (UNREAL_HOST_PROJECT) is THIS repository's own
+          # host (bootstrapped by test_unreal_plugin.yml, never shared with another repo); its UnrealMCP core
+          # plugin must be installed (its bridge built / server pinned) — set up once per runner.
           Start-Process -FilePath "npx" -ArgumentList @(
             '--yes','unreal-mcp-cli','open',"$projectDir",'--start-server','--connection-mode','Custom'
           ) -NoNewWindow
@@ -110,6 +117,9 @@ jobs:
         shell: pwsh
         run: |
           npx --yes unreal-mcp-cli close (Split-Path -Parent $env:HOST_UPROJECT) 2>$null
+          # Then stop anything still referencing this repository's own host (editor, UBT,
+          # ShaderCompileWorker, the local server) - never another repository's processes.
+          ./.github/scripts/stop-host-processes.ps1 -HostDir (Split-Path -Parent $env:HOST_UPROJECT)
           exit 0
 
       - name: Cleanup this job's build outputs (self-hosted disk hygiene)

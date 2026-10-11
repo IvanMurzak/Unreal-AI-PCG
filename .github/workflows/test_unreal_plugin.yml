@@ -13,10 +13,17 @@
 #
 # Required repository configuration before enabling:
 #   vars.UNREAL_RUNNER_READY = 'true'
-#   vars.UNREAL_HOST_PROJECT = absolute path on the runner to a host .uproject that
-#     has the UnrealMCP core plugin available (its Plugins/UnrealMCP junctions to a
-#     UnrealMCP checkout/package). This workflow junctions THIS extension into the
-#     same host's Plugins/ and builds the host editor target so the specs compile in.
+#   vars.UNREAL_HOST_PROJECT = absolute path on the runner to THIS repository's OWN host
+#     .uproject, e.g. C:\actions-runner-unreal\host-<repo>\UnrealTestProject\UnrealTestProject.uproject.
+#     Never share it with another repository: the Unreal-AI-* extensions and the Unreal-MCP
+#     core CI run on the same machines, and every job mutates its host (Plugins\UnrealMCP
+#     junction, the sibling UnrealMCP-src clone, Intermediate). A shared host made concurrent
+#     jobs fail ("Failed to (re)create host junction") and leaked extension junctions into the
+#     core's tool-contract smoke. A missing host is bootstrapped from the machine's canonical
+#     host template (optional vars.UNREAL_HOST_TEMPLATE, default
+#     C:\actions-runner-unreal\host\UnrealTestProject; Source/Config/.uproject only). This
+#     workflow junctions THIS extension into the host's Plugins/, builds the host editor
+#     target so the specs compile in, and unlinks that junction again at job end.
 name: test-unreal-plugin
 
 on:
@@ -37,10 +44,17 @@ jobs:
     # repo, never a fork (a fork PR must never run its checked-out code on a self-hosted
     # runner). Manual dispatches are trusted and unaffected by the fork clause.
     if: ${{ vars.UNREAL_RUNNER_READY == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-    runs-on: [self-hosted, windows, unreal]
+    # Versioned runner label (unreal-5-7 for UE 5.7): the job only lands on a machine that has
+    # this engine installed. Expressions have no replace(), hence the lookup; an unmapped
+    # version yields e.g. `unreal-5.10`, which no runner carries (add it to the map).
+    runs-on:
+      - self-hosted
+      - windows
+      - ${{ fromJSON('{"5.5":"unreal-5-5","5.6":"unreal-5-6","5.7":"unreal-5-7","5.8":"unreal-5-8","5.9":"unreal-5-9"}')[inputs.ue] || format('unreal-{0}', inputs.ue) }}
     env:
       UE_ROOT: C:\Program Files\Epic Games\UE_${{ inputs.ue }}
       HOST_UPROJECT: ${{ vars.UNREAL_HOST_PROJECT }}
+      HOST_TEMPLATE_DIR: ${{ vars.UNREAL_HOST_TEMPLATE || 'C:\actions-runner-unreal\host\UnrealTestProject' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -59,6 +73,50 @@ jobs:
           echo "plugin_dir=$($uplugin.Directory.FullName)" >> $env:GITHUB_OUTPUT
           echo "module=$module" >> $env:GITHUB_OUTPUT
           echo "Resolved plugin '$module' at $($uplugin.Directory.FullName)"
+
+      # ── This repository's OWN host project (never the shared core host) ───────────
+      # A per-repo host has exactly one writer per machine (the one runner this repository
+      # registers there), so jobs of different repositories can run at the same time. Bootstrap
+      # copies only Source/Config/.uproject (not Content, which the core's specs write assets
+      # into; not Binaries/Intermediate/Saved/DDC/Plugins; never through a junction) into a
+      # staging dir and renames it into place, so an interrupted copy never leaves a half-made
+      # host behind.
+      - name: Bootstrap this repository's own host project (if missing)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:HOST_UPROJECT)) {
+            throw "UNREAL_HOST_PROJECT repo variable is not set — the host build needs this repository's own host .uproject (see docs/agents/ci.md)."
+          }
+          $hostDir = [IO.Path]::GetFullPath((Split-Path -Parent $env:HOST_UPROJECT)).TrimEnd('\')
+          $templateDir = [IO.Path]::GetFullPath($env:HOST_TEMPLATE_DIR).TrimEnd('\')
+          if ($hostDir -ieq $templateDir) {
+            throw "UNREAL_HOST_PROJECT points at the SHARED host $templateDir — give this repository its own host, e.g. C:\actions-runner-unreal\host-$($env:GITHUB_REPOSITORY.Split('/')[1])\UnrealTestProject\UnrealTestProject.uproject (see docs/agents/ci.md)."
+          }
+          if (Test-Path -LiteralPath $env:HOST_UPROJECT) {
+            Write-Host "Host project present: $env:HOST_UPROJECT"
+            exit 0
+          }
+          $templateUproject = Join-Path $templateDir (Split-Path -Leaf $env:HOST_UPROJECT)
+          if (-not (Test-Path -LiteralPath $templateUproject)) {
+            throw "Cannot bootstrap $env:HOST_UPROJECT — template $templateUproject not found (set UNREAL_HOST_TEMPLATE to a host project dir holding a .uproject of the same name)."
+          }
+          $staging = "$hostDir.bootstrap"
+          if (Test-Path -LiteralPath $staging) { cmd /c rmdir /s /q "$staging" }
+          New-Item -ItemType Directory -Force -Path (Split-Path -Parent $hostDir) | Out-Null
+          Write-Host "Bootstrapping $hostDir from $templateDir"
+          robocopy "$templateDir" "$staging" /E /XJ /XD Binaries Intermediate Saved DerivedDataCache Plugins Content .vs /R:2 /W:2 /NFL /NDL /NP
+          if ($LASTEXITCODE -ge 8) { throw "robocopy $templateDir -> $staging failed (exit $LASTEXITCODE)." }
+          Move-Item -LiteralPath $staging -Destination $hostDir
+          Write-Host "Host project bootstrapped: $env:HOST_UPROJECT"
+          exit 0  # robocopy's 1..7 are success codes; do not let pwsh re-raise them
+
+      # A run of THIS repository that was cancelled or lost its runner can leave UnrealEditor-Cmd /
+      # UBT / ShaderCompileWorker alive, holding this host's DLLs open. Only processes whose command
+      # line references this repository's own host dir (and their descendants) are stopped.
+      - name: Stop UE processes an interrupted earlier run left on this host
+        shell: pwsh
+        run: ./.github/scripts/stop-host-processes.ps1 -HostDir (Split-Path -Parent $env:HOST_UPROJECT)
 
       # ── Self-heal the host's UnrealMCP plugin BEFORE UBT reads the makefile ──────
       # The host .uproject requires the UnrealMCP core plugin (enabled). Its
@@ -221,15 +279,20 @@ jobs:
         # core + the other Unreal-AI-* extensions) and its RUNNER_TEMP + the persistent
         # runner-local host project are NOT auto-pruned after a job, so this job's Automation
         # report and the host's transient logs/crashes accumulate across runs. Remove ONLY
-        # THIS job's own regenerable outputs. Deliberately NOT touched:
-        #   * host DerivedDataCache / Intermediate / Binaries - a persistent shared-for-speed
+        # THIS job's own regenerable outputs, stop the UE processes it started (editor, UBT,
+        # ShaderCompileWorker: everything referencing this repo's host, plus descendants), and
+        # unlink THIS job's own host junction so no extension junction outlives its job.
+        # Deliberately NOT touched:
+        #   * host DerivedDataCache / Intermediate / Binaries - a persistent per-repo speed
         #     cache; deleting it forces a full shader/host recompile every run.
-        #   * the host Plugins\<module> junction - re-created by the build step above.
+        #   * the host Plugins\UnrealMCP junction - re-validated by the self-heal step every run.
         #   * Docker - these UE jobs use no containers, and the daemon is shared with other
         #     runners' ACTIVE jobs.
         # Best-effort: a cleanup failure must NEVER red an otherwise-green run.
         if: always()
         shell: pwsh
+        env:
+          MODULE: ${{ steps.meta.outputs.module }}
         run: |
           $ErrorActionPreference = 'Continue'
           function Remove-Tree([string]$p) {
@@ -237,6 +300,21 @@ jobs:
             Write-Host "Removing $p"
             cmd /c rmdir /s /q "$p" 2>$null
             if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue }
+          }
+          # 0. UE processes this job started against its host (never another repository's).
+          $reaper = Join-Path $env:GITHUB_WORKSPACE '.github\scripts\stop-host-processes.ps1'
+          if (-not [string]::IsNullOrWhiteSpace($env:HOST_UPROJECT) -and (Test-Path -LiteralPath $reaper)) {
+            & $reaper -HostDir (Split-Path -Parent $env:HOST_UPROJECT)
+          }
+          # 0b. This job's Plugins\<module> junction. Delete() on a junction removes the link
+          #    only; it never recurses into the target (this job's checkout).
+          if (-not [string]::IsNullOrWhiteSpace($env:HOST_UPROJECT) -and -not [string]::IsNullOrWhiteSpace($env:MODULE)) {
+            $link = Join-Path (Split-Path -Parent $env:HOST_UPROJECT) "Plugins\$env:MODULE"
+            $item = Get-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
+            if ($item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+              $item.Delete()
+              Write-Host "Unlinked host junction $link"
+            }
           }
           # 1. This job's per-run Automation report under RUNNER_TEMP.
           Remove-Tree (Join-Path $env:RUNNER_TEMP 'AutomationReport')

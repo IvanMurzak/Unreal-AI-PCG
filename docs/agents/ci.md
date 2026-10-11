@@ -15,15 +15,42 @@ release, and a manual bump workflow.
 
 ## Self-hosted runner gating (never red-by-absence)
 
-The UBT/Automation/E2E legs run on a **self-hosted Windows UE runner** (label
-`[self-hosted, windows, unreal]`). They are gated so they **skip** — never fail a PR — until you
+The UBT/Automation/E2E legs run on a **self-hosted Windows UE runner** (labels
+`[self-hosted, windows, unreal-<ue>]`, e.g. `unreal-5-7`; label each runner with one `unreal-X-Y` per UE version
+installed on its machine, so a job only lands where its engine exists). They are gated so they **skip** — never fail a PR — until you
 register a runner and set repository variables:
 
 | Variable | Enables |
 | --- | --- |
 | `UNREAL_RUNNER_READY = true` | `test_unreal_plugin.yml` (UBT build + Automation) and `release.yml` build/test legs |
 | `UNREAL_E2E_READY = true` | the E2E `install-extension` + tool-invocation job in `test_pull_request.yml` |
-| `UNREAL_HOST_PROJECT` | absolute path on the runner to a host `.uproject` that has the **UnrealMCP core plugin** available (the Automation pass junctions this extension into its `Plugins/` and builds the host editor target) |
+| `UNREAL_HOST_PROJECT` | absolute path on the runner to **this repository's own** host `.uproject`, e.g. `C:\actions-runner-unreal\host-<repo>\UnrealTestProject\UnrealTestProject.uproject` (the Automation pass junctions this extension into its `Plugins/`, junctions the **UnrealMCP core plugin** from a sibling `UnrealMCP-src` clone, and builds the host editor target). See "Host project isolation" below. |
+| `UNREAL_HOST_TEMPLATE` (optional) | host project dir a missing `UNREAL_HOST_PROJECT` is bootstrapped from; default `C:\actions-runner-unreal\host\UnrealTestProject` |
+
+## Host project isolation
+
+Several repositories run UE jobs on the same machines: every `Unreal-AI-*` extension and the
+Unreal-MCP core CI. A job mutates its host project (the `Plugins\UnrealMCP` junction, the sibling
+`UnrealMCP-src` clone, `Intermediate`), so a host shared between repositories breaks concurrent jobs
+(`Failed to (re)create host junction`) and leaks extension junctions into whatever opens that host
+next (the core's tool-contract smoke). GitHub `concurrency:` groups are per repository and cannot
+serialize across repos, so isolation is by path instead:
+
+- `UNREAL_HOST_PROJECT` is per repository (`host-<repo>`). Each repository registers one runner per
+  machine, so each host has exactly one writer. If you add a second runner for the same repository
+  on one machine, it needs its own host too.
+- `test_unreal_plugin.yml` refuses the shared template path and, when the host is missing, copies the
+  template's `Source/`, `Config/` and `.uproject` into place (not `Content`, which the core's specs
+  write assets into; not `Binaries`, `Intermediate`, `Saved`, `DerivedDataCache` or `Plugins`).
+  Disk cost: one host `Intermediate`
+  (~2.5 GB per UE version, mostly the UnrealEd shared PCH) plus one `UnrealMCP-src` clone per repo.
+- The job's always-run cleanup unlinks its own `Plugins\<Module>` junction (the link only, never the
+  target), so no extension junction outlives its job.
+- Processes: `.github/scripts/stop-host-processes.ps1` stops every process whose command line references
+  this repository's host dir (UnrealEditor-Cmd, UBT, ShaderCompileWorker, the E2E server) plus its
+  descendants. It runs before the build, to clear what an interrupted earlier run left behind, and again
+  in the always-run cleanup. Per-repo hosts guarantee it never matches another repository's job.
+  Persistent workspaces and build caches (`Intermediate`, `Binaries`, DDC, `UnrealMCP-src`) are kept on purpose.
 
 Fork PRs never run on the self-hosted runner (`head.repo.full_name == github.repository` guard); a
 fork PR's checked-out code must not execute on your machine.
